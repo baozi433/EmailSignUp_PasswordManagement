@@ -1,5 +1,6 @@
 global using EmailSignUp_PasswordManagement.Models;
 global using EmailSignUp_PasswordManagement.Data;
+global using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
