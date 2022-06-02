@@ -72,13 +72,52 @@ namespace EmailSignUp_PasswordManagement.Controllers
 
             if (user == null)
             {
-                return NotFound("Token invalid");
+                return BadRequest("Token invalid");
             }
 
             user.VerifiedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             return Ok("User verified!");
+        }
+
+        [HttpPost("forget-password")]
+        public async Task<IActionResult> ForgetPassword(string email)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+
+            if (user == null)
+            {
+                return NotFound("User not found");
+            }
+
+            user.PasswordResetToken = CreateRandomToken();
+            user.ResetTokenExpires = DateTime.Now.AddDays(1);
+
+            await _context.SaveChangesAsync();
+
+            return Ok("You can now reset your password");
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword(ResetPasswordRequest request)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.PasswordResetToken == request.Token);
+
+            if (user == null || user.ResetTokenExpires < DateTime.Now)
+            {
+                return BadRequest("Token invalid");
+            }
+
+            CreatePasswordHash(request.Password, out byte[] passwordHash, out byte[] passwordSalt);
+            user.PasswordHash = passwordHash;
+            user.PasswordSalt = passwordSalt;
+            user.ResetTokenExpires = null;
+            user.PasswordResetToken = null;
+
+            await _context.SaveChangesAsync();
+
+            return Ok("Password reset successfully");
         }
 
         //Create random token for test
