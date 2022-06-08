@@ -1,4 +1,5 @@
 ﻿using EmailSignUp_PasswordManagement.Repositories.Contracts;
+using EmailSignUp_PasswordManagement.Services.Contracts;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Cryptography;
@@ -11,11 +12,15 @@ namespace EmailSignUp_PasswordManagement.Controllers
     {
         private readonly DataContext _context;
         private readonly IUserRepository _userRepository;
+        private readonly IEmailService _emailService;
 
-        public UserController(DataContext context, IUserRepository userRepository)
+        public enum EmailCategories { Registration, ForgetPassword, VerifyEmail }
+
+        public UserController(DataContext context, IUserRepository userRepository, IEmailService emailService)
         {
             _context = context;
             _userRepository = userRepository;
+            _emailService = emailService;
         }
 
         [HttpPost("register")]
@@ -26,10 +31,11 @@ namespace EmailSignUp_PasswordManagement.Controllers
                 return BadRequest("User already exists.");
             }
 
-            await _userRepository.AddUser(request);
+            var user = await _userRepository.AddUser(request);
+
+            SendEmail(user, EmailCategories.Registration);
 
             return Ok("User sucessfully created!");
-
         }
 
         [HttpPost("login")]
@@ -68,6 +74,8 @@ namespace EmailSignUp_PasswordManagement.Controllers
                 return BadRequest("Token invalid");
             }
 
+            SendEmail(user, EmailCategories.VerifyEmail);
+
             return Ok("User verified!");
         }
 
@@ -80,6 +88,8 @@ namespace EmailSignUp_PasswordManagement.Controllers
             {
                 return NotFound("User not found");
             }
+
+            SendEmail(user, EmailCategories.ForgetPassword);
 
             return Ok("You can now reset your password");
         }
@@ -100,5 +110,38 @@ namespace EmailSignUp_PasswordManagement.Controllers
                 return computedHash.SequenceEqual(passwordHash);
             }
         }
+
+        private void SendEmail(User user, EmailCategories emailCategories)
+        {
+            var emailDto = new EmailDto();
+            emailDto.To = user.Email;
+
+            switch (emailCategories)
+            {
+                case EmailCategories.Registration:
+                    {
+                        emailDto.Subject = "Thank you for the registration";
+                        emailDto.Body = $"This is your verify token : {user.VerificationToken}";
+                        break;
+                    }
+                case EmailCategories.ForgetPassword:
+                    {
+                        emailDto.Subject = "You can reset your password now";
+                        emailDto.Body = $"This is your reset token : {user.PasswordResetToken}. \n Please reset your password before {user.ResetTokenExpires}";
+                        break;
+                    }
+                case EmailCategories.VerifyEmail:
+                    {
+                        emailDto.Subject = "Thanks for confirming your email";
+                        emailDto.Body = $"Your account has been verified at : {user.VerifiedAt}";
+                        break;
+                    }
+                default:
+                    break;
+            }
+            
+            _emailService.SendEmail(emailDto);
+        }
+
     }
 }

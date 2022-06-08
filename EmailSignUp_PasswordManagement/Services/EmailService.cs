@@ -18,7 +18,7 @@ namespace EmailSignUp_PasswordManagement.Services
         {
             var email = new MimeMessage();
             email.From.Add(MailboxAddress.Parse(_configuration.GetSection("Email").GetSection("Username").Value));
-            email.To.Add(MailboxAddress.Parse("s4tbgfovsdytui4c@ethereal.email"));
+            email.To.Add(MailboxAddress.Parse(request.To));
             email.Subject = request.Subject;
             email.Body = new TextPart(TextFormat.Html) { Text = request.Body };
 
