@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using EmailSignUp_PasswordManagement.Repositories.Contracts;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Cryptography;
 
@@ -9,33 +10,23 @@ namespace EmailSignUp_PasswordManagement.Controllers
     public class UserController : ControllerBase
     {
         private readonly DataContext _context;
+        private readonly IUserRepository _userRepository;
 
-        public UserController(DataContext context)
+        public UserController(DataContext context, IUserRepository userRepository)
         {
             _context = context;
+            _userRepository = userRepository;
         }
 
         [HttpPost("register")]
         public async Task<IActionResult> Register(UserRegisterRequest request)
         {
-            if(_context.Users.Any(u => u.Email == request.Email))
+            if(_userRepository.CheckUserRegistered(request))
             {
                 return BadRequest("User already exists.");
             }
 
-            CreatePasswordHash(request.Password,
-                out byte[] passwordHash, out byte[] passwordSalt);
-
-            var user = new User
-            {
-                Email = request.Email,
-                PasswordHash = passwordHash,
-                PasswordSalt = passwordSalt,
-                VerificationToken = CreateRandomToken()
-            };
-
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
+            await _userRepository.AddUser(request);
 
             return Ok("User sucessfully created!");
 
@@ -44,14 +35,16 @@ namespace EmailSignUp_PasswordManagement.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login(UserLoginRequest request)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+            var user = await _userRepository.GetUser(request);
 
             if(user == null)
             {
                 return NotFound("User not exists");
             }
 
-            if (!VerifyPasswordHash(request.Password, user.PasswordHash, user.PasswordSalt))
+            var verifyPasswordHash = VerifyPasswordHash(request.Password, user.PasswordHash, user.PasswordSalt);
+
+            if (!verifyPasswordHash)
             {
                 return BadRequest("The password is incorrect");
             }
@@ -68,15 +61,12 @@ namespace EmailSignUp_PasswordManagement.Controllers
         [HttpPost("verify")]
         public async Task<IActionResult> Verify(string token)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.VerificationToken == token);
+            var user = await _userRepository.VerifyUser(token);
 
             if (user == null)
             {
                 return BadRequest("Token invalid");
             }
-
-            user.VerifiedAt = DateTime.Now;
-            await _context.SaveChangesAsync();
 
             return Ok("User verified!");
         }
@@ -84,17 +74,12 @@ namespace EmailSignUp_PasswordManagement.Controllers
         [HttpPost("forget-password")]
         public async Task<IActionResult> ForgetPassword(string email)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+            var user = await _userRepository.ForgetPassword(email);
 
             if (user == null)
             {
                 return NotFound("User not found");
             }
-
-            user.PasswordResetToken = CreateRandomToken();
-            user.ResetTokenExpires = DateTime.Now.AddDays(1);
-
-            await _context.SaveChangesAsync();
 
             return Ok("You can now reset your password");
         }
@@ -102,37 +87,9 @@ namespace EmailSignUp_PasswordManagement.Controllers
         [HttpPost("reset-password")]
         public async Task<IActionResult> ResetPassword(ResetPasswordRequest request)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.PasswordResetToken == request.Token);
+            var user = await _userRepository.ResetPassword(request);
 
-            if (user == null || user.ResetTokenExpires < DateTime.Now)
-            {
-                return BadRequest("Token invalid");
-            }
-
-            CreatePasswordHash(request.Password, out byte[] passwordHash, out byte[] passwordSalt);
-            user.PasswordHash = passwordHash;
-            user.PasswordSalt = passwordSalt;
-            user.ResetTokenExpires = null;
-            user.PasswordResetToken = null;
-
-            await _context.SaveChangesAsync();
-
-            return Ok("Password reset successfully");
-        }
-
-        //Create random token for test
-        private string CreateRandomToken()
-        {
-            return Convert.ToHexString(RandomNumberGenerator.GetBytes(64));
-        }
-
-        private void CreatePasswordHash(string password, out byte[] passwordHash, out byte[] passwordSalt)
-        {
-            using (var hmac = new HMACSHA512())
-            {
-                passwordSalt = hmac.Key;
-                passwordHash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
-            }
+            return (user is null) ? BadRequest("Invalid token") : Ok("Password reset successfully");
         }
 
         private bool VerifyPasswordHash(string password, byte[] passwordHash, byte[] passwordSalt)
