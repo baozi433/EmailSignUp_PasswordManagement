@@ -3,6 +3,8 @@ global using EmailSignUp_PasswordManagement.Data;
 global using Microsoft.EntityFrameworkCore;
 using EmailSignUp_PasswordManagement.Repositories;
 using EmailSignUp_PasswordManagement.Repositories.Contracts;
+using EmailSignUp_PasswordManagement.Services.Contracts;
+using EmailSignUp_PasswordManagement.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +16,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<DataContext>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 
 var app = builder.Build();
 
