@@ -14,7 +14,7 @@ namespace EmailSignUp_PasswordManagement.Data
         {
             base.OnConfiguring(optionsBuilder);
             optionsBuilder.
-                UseSqlServer("Server=.\\SQLEXPRESS;Database=userdb;Trusted_Connection=True;");
+                UseSqlServer("Server=YUANJIE-WU\\SQLEXPRESS;Database=LocalDb;Trusted_Connection=True;");
         }
 
         public DbSet<User> Users => Set<User>();

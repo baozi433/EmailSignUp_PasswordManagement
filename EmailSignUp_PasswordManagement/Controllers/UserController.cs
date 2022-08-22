@@ -10,15 +10,13 @@ namespace EmailSignUp_PasswordManagement.Controllers
     [ApiController]
     public class UserController : ControllerBase
     {
-        private readonly DataContext _context;
         private readonly IUserRepository _userRepository;
         private readonly IEmailService _emailService;
 
-        public enum EmailCategories { Registration, ForgetPassword, VerifyEmail }
+        public enum EmailCategories { Registration, ForgetPassword, VerifyEmail } //Sending email in the different situations
 
-        public UserController(DataContext context, IUserRepository userRepository, IEmailService emailService)
+        public UserController(IUserRepository userRepository, IEmailService emailService)
         {
-            _context = context;
             _userRepository = userRepository;
             _emailService = emailService;
         }
